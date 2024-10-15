@@ -49,13 +49,14 @@ module package_addr::example {
 	}
 
 	/// Game settings managed by a given `admin`.  Holds payments for player actions for the admin to collect.
-	public struct Game has key {
+	public struct GameInfo has key {
 			id: UID,//all items in this game should have the same value as game_id
-			payments: Balance<SUI>,
+			//payments: Balance<SUI>,
+			admin: address,
 	}
 
 	/// Only Admin can add boars and potions, and take payments.
-	public struct Admin has key, store {
+	public struct GameAdmin has key, store {
 			id: UID,
 			/// ID of the game this admin manages
 			game_id: ID,
@@ -85,10 +86,43 @@ module package_addr::example {
 	// === Error Codes ===
 	/// Objects are from a different game
 	const EWrongGame: u64 = 0;
-	const EBoarWon: u64 = 1;
-	const EHeroTired: u64 = 2;
-	const ENotAdmin: u64 = 3;
-	const EInsufficientFunds: u64 = 5;
-	const EAlreadyEquipped: u64 = 6;
-	const ENotEquipped: u64 = 7;
+
+	const EBOAR_WON: u64 = 0;
+	const EHERO_TIRED: u64 = 1;
+	const ENOT_ADMIN: u64 = 2;
+	const EINSUFFICIENT_FUNDS: u64 = 3;
+	const ENO_SWORD: u64 = 4;
+	const ASSERT_ERR: u64 = 999;
+	
+	// --- Initialization
+
+	/// On module publish, sender creates a new game. But once it is published,
+	/// anyone create a new game with a `new_game` function.
+	fun init(ctx: &mut TxContext) {
+			create(ctx);
+	}
+
+	/// Anyone can create run their own game, all game objects will be
+	/// linked to this game.
+	public entry fun new_game(ctx: &mut TxContext) {
+			create(ctx);
+	}
+
+	/// Create a new game. Separated to bypass public entry vs init requirements.
+	fun create(ctx: &mut TxContext) {
+			let sender = tx_context::sender(ctx);
+			let id = object::new(ctx);
+			let game_id = object::uid_to_inner(&id);
+
+			transfer::freeze_object(GameInfo {
+					id, admin: sender,
+			});
+			transfer::transfer(GameAdmin {
+							id: object::new(ctx),
+							game_id,
+							boars_created: 0,
+							potions_created: 0,
+					},sender);
+	}
+
 }
